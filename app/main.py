@@ -2,6 +2,9 @@ from fastapi import FastAPI, UploadFile, File, HTTPException
 from app.ingest import extract_text_from_pdf, chunk_text 
 from app.db import get_connection
 from app.embeddings import embed_batch 
+from app.retrieval import retrieve_chunks
+from app.answer import answer_question
+from pydantic import BaseModel
 
 
 app = FastAPI(title="DocuChat API")
@@ -45,3 +48,23 @@ async def upload_pdf(file: UploadFile = File(...)):
         "pages_extracted": len(pages),
         "chunks_stored": len(all_chunks),
     }
+
+    class AskRequest(BaseModel):
+        question: str
+
+    @app.post("/ask")
+    def ask(request: AskRequest):
+        chunks = retrieve_chunks(request.question, top_k=5)
+        if not chunks:
+            raise HTTPException(status_code=404, detail="No documents have been uploaded yet")
+
+        answer = answer_question(request.question, chunks)
+        return {
+            "question": request.question,
+            "answer": answer,
+            "sources": [
+                {"chunk": i + 1, "page": c["page"], "filename": c["filename"]}
+                for i, c in enumerate(chunks)
+            ]
+        },
+    
