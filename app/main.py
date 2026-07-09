@@ -1,5 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
-from app.ingest import extract_text_from_pdf
+from app.ingest import extract_text_from_pdf, chunk_text 
+
 
 app = FastAPI(title="DocuChat API")
 
@@ -16,11 +17,16 @@ async def upload_pdf(file: UploadFile = File(...)):
     pages = extract_text_from_pdf(file_bytes)
 
     if not pages:
-        raise HTTPException(status_code=400, detail=400, detail="No text could be extracted from this PDF")
+        raise HTTPException(status_code=400, detail="No text could be extracted from this PDF")
 
-    total_chars = sum(len(p["text"]) for p in pages)
+    all_chunks = []
+    for page in pages:
+        for chunk in chunk_text(page["text"]):
+            all_chunks.append({"page": page["page"], "text": chunk})
+
     return {
         "filename": file.filename,
         "pages_extracted": len(pages),
-        "total_characters": total_chars,
+        "chunks_created": len(all_chunks),
+        "sample_chunk": all_chunks[0]["text"][:200] if all_chunks else None,
     }
