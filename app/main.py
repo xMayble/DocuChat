@@ -1,14 +1,19 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from app.ingest import extract_text_from_pdf, chunk_text 
-from app.db import get_connection
+from app.db import get_connection, init_db
 from app.embeddings import embed_batch 
 from app.retrieval import retrieve_chunks
 from app.answer import answer_question
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware 
+from contextlib import asynccontextmanager
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    init_db()
+    yield
 
-app = FastAPI(title="DocuChat API")
+app = FastAPI(title="DocuChat API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
